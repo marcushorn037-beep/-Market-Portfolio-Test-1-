@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Canadian Market Portfolio Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Canadian investment overview</p>
+          <h1>Market Portfolio Tracker</h1>
+        </div>
+        <div class="top-actions">
+          <div class="date-pill" id="currentDate">Loading...</div>
+          <form action="/export" method="GET">
+            <button class="secondary" type="submit">Export CSV</button>
+          </form>
+        </div>
+      </header>
+
+      <section class="summary-grid">
+        <div class="card">
+          <span class="label">Portfolio Value</span>
+          <strong class="value">${{ '%.2f' % summary.total_value }}</strong>
+        </div>
+        <div class="card">
+          <span class="label">Total Cost</span>
+          <strong class="value">${{ '%.2f' % summary.total_cost }}</strong>
+        </div>
+        <div class="card">
+          <span class="label">Total Gain/Loss</span>
+          <strong class="value {% if summary.total_gain >= 0 %}positive{% else %}negative{% endif %}">${{ '%.2f' % summary.total_gain }}</strong>
+        </div>
+        <div class="card">
+          <span class="label">Annual Dividend</span>
+          <strong class="value">${{ '%.2f' % summary.dividend_income }}</strong>
+        </div>
+        <div class="card">
+          <span class="label">Return</span>
+          <strong class="value {% if summary.gain_pct >= 0 %}positive{% else %}negative{% endif %}">{{ '%.2f' % summary.gain_pct }}%</strong>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Add a holding</h2>
+        <form action="/add" method="POST" class="holding-form">
+          <div class="field">
+            <label for="ticker">Ticker</label>
+            <input id="ticker" name="ticker" type="text" placeholder="e.g. RY" required />
+          </div>
+
+          <div class="field">
+            <label for="company">Company</label>
+            <input id="company" name="company" type="text" placeholder="Royal Bank" required />
+          </div>
+
+          <div class="field">
+            <label for="sector">Sector</label>
+            <input id="sector" name="sector" type="text" placeholder="Financials" />
+          </div>
+
+          <div class="field">
+            <label for="shares">Shares</label>
+            <input id="shares" name="shares" type="number" step="0.01" min="0" placeholder="10" required />
+          </div>
+
+          <div class="field">
+            <label for="avg_cost">Average Cost</label>
+            <input id="avg_cost" name="avg_cost" type="number" step="0.01" min="0" placeholder="120.50" required />
+          </div>
+
+          <div class="field">
+            <label for="annual_dividend">Annual Dividend</label>
+            <input id="annual_dividend" name="annual_dividend" type="number" step="0.01" min="0" placeholder="3.20" />
+          </div>
+
+          <div class="field">
+            <label for="currency">Currency</label>
+            <select id="currency" name="currency">
+              <option value="CAD">CAD</option>
+              <option value="USD">USD</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="exchange">Exchange</label>
+            <select id="exchange" name="exchange">
+              <option value="TSX">TSX</option>
+              <option value="TSXV">TSXV</option>
+              <option value="NASDAQ">NASDAQ</option>
+              <option value="NYSE">NYSE</option>
+            </select>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit">Add Holding</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Holdings</h2>
+          <span class="muted">{{ summary.holdings_count }} positions</span>
+        </div>
+
+        {% if holdings %}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Company</th>
+                <th>Sector</th>
+                <th>Shares</th>
+                <th>Avg Cost</th>
+                <th>Current Price</th>
+                <th>Market Value</th>
+                <th>Gain/Loss</th>
+                <th>Annual Dividend</th>
+                <th>Return</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for holding in holdings %}
+              <tr>
+                <td><strong>{{ holding.ticker }}</strong></td>
+                <td>{{ holding.company }}</td>
+                <td>{{ holding.sector }}</td>
+                <td>{{ '%.2f' % holding.shares }}</td>
+                <td>${{ '%.2f' % holding.avg_cost }}</td>
+                <td>${{ '%.2f' % holding.current_price }}</td>
+                <td>${{ '%.2f' % holding.market_value }}</td>
+                <td class="{% if holding.gain_loss >= 0 %}positive{% else %}negative{% endif %}">${{ '%.2f' % holding.gain_loss }}</td>
+                <td>${{ '%.2f' % holding.dividend_income }}</td>
+                <td class="{% if holding.gain_pct >= 0 %}positive{% else %}negative{% endif %}">{{ '%.2f' % holding.gain_pct }}%</td>
+                <td>
+                  <form action="{{ url_for('delete_holding', holding_id=holding.id) }}" method="POST">
+                    <button class="danger" type="submit">Delete</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+          <p>No holdings yet. Add your first Canadian investment to get started.</p>
+        </div>
+        {% endif %}
+      </section>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>
