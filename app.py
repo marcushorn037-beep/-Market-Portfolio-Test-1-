@@ -2,17 +2,49 @@ from flask import Flask, render_template, request, redirect, url_for, send_file
 import sqlite3
 import csv
 import io
+import os
 from decimal import Decimal, ROUND_HALF_UP
 import yfinance as yf
 
 app = Flask(__name__)
+app.config["DEMO_MODE"] = os.environ.get("DEMO_MODE", "").lower() in {"1", "true", "yes", "on"}
 DB_NAME = "portfolio.db"
+
+DEMO_PRICES = {
+    "RY": 118.42,
+    "TD": 87.25,
+    "BNS": 67.10,
+    "CNQ": 49.85,
+    "XIU": 34.60,
+    "MSFT": 423.15,
+    "AAPL": 214.77,
+}
 
 
 def get_db():
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def seed_demo_data():
+    demo_holdings = [
+        ("RY", "Royal Bank of Canada", "Financials", 12, 102.40, 4.10, "CAD", "TSX"),
+        ("TD", "Toronto-Dominion Bank", "Financials", 9, 81.75, 3.65, "CAD", "TSX"),
+        ("CNQ", "Canadian Natural Resources", "Energy", 18, 38.90, 2.70, "CAD", "TSX"),
+        ("XIU", "iShares S&P/TSX 60 Index ETF", "ETF", 22, 31.25, 1.90, "CAD", "TSX"),
+    ]
+
+    conn = get_db()
+    conn.executemany(
+        """
+        INSERT INTO holdings (ticker, company, sector, shares, avg_cost, annual_dividend, currency, exchange)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        demo_holdings,
+    )
+    conn.commit()
+    conn.close()
 
 
 def init_db():
@@ -33,25 +65,38 @@ def init_db():
         )
         """
     )
+
+    if app.config.get("DEMO_MODE"):
+        row = conn.execute("SELECT COUNT(*) as count FROM holdings").fetchone()
+        if row["count"] == 0:
+            seed_demo_data()
+
     conn.commit()
     conn.close()
 
 
 def normalize_ticker(ticker, exchange):
-    symbol = (ticker or "").strip().upper()
+    symbol = (ticker or "").strip().upper().replace(" ", "")
     if not symbol:
         return symbol
 
     if any(symbol.endswith(suffix) for suffix in [".TO", ".TSE", ".V", ".N", ".NYSE", ".NASDAQ"]):
         return symbol
 
-    if exchange in ("TSX", "TSXV", "TSE"):
+    normalized_exchange = (exchange or "").upper().replace("-", "").replace(" ", "")
+    if normalized_exchange in {"TSX", "TSE", "TSXH"}:
         return f"{symbol}.TO"
+    if normalized_exchange in {"TSXV", "TSXVENTURE"}:
+        return f"{symbol}.V"
     return symbol
 
 
 def fetch_market_price(ticker, exchange):
     symbol = normalize_ticker(ticker, exchange)
+    base_symbol = symbol.split(".")[0].upper()
+    if base_symbol in DEMO_PRICES:
+        return float(DEMO_PRICES[base_symbol])
+
     try:
         stock = yf.Ticker(symbol)
 
@@ -233,5 +278,6 @@ def export_csv():
 
 
 if __name__ == "__main__":
+    app.config["DEMO_MODE"] = True
     init_db()
     app.run(debug=True, host="0.0.0.0", port=5000)
